@@ -101,8 +101,11 @@ const MainFeature = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [startDragPosition, setStartDragPosition] = useState({ x: 0, y: 0 });
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   
   const imageRef = useRef(null);
+  const viewerRef = useRef(null);
   
   const currentArtwork = selectedExhibition.artworks[currentArtworkIndex];
 
@@ -111,6 +114,23 @@ const MainFeature = () => {
     setZoomLevel(1);
     setDragPosition({ x: 0, y: 0 });
   }, [currentArtworkIndex, selectedExhibition]);
+
+  useEffect(() => {
+    // Check if we're in mobile view
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 768);
+      setShowSidebar(window.innerWidth >= 768);
+    };
+    
+    // Initial check
+    checkMobileView();
+    
+    // Set up listener for window resize
+    window.addEventListener('resize', checkMobileView);
+    
+    // Clean up listener on component unmount
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
 
   const handleZoomIn = () => {
     setZoomLevel(prev => Math.min(prev + 0.25, 3));
@@ -137,6 +157,7 @@ const MainFeature = () => {
     );
   };
 
+  // Mouse events
   const handleMouseDown = (e) => {
     if (zoomLevel > 1) {
       setIsDragging(true);
@@ -153,8 +174,8 @@ const MainFeature = () => {
       const newY = e.clientY - startDragPosition.y;
       
       // Calculate boundaries based on zoom level
-      const maxX = (imageRef.current.offsetWidth * (zoomLevel - 1)) / 2;
-      const maxY = (imageRef.current.offsetHeight * (zoomLevel - 1)) / 2;
+      const maxX = (imageRef.current?.offsetWidth * (zoomLevel - 1)) / 2 || 0;
+      const maxY = (imageRef.current?.offsetHeight * (zoomLevel - 1)) / 2 || 0;
       
       setDragPosition({
         x: Math.max(-maxX, Math.min(maxX, newX)),
@@ -171,59 +192,120 @@ const MainFeature = () => {
     setIsDragging(false);
   };
 
+  // Touch events
+  const handleTouchStart = (e) => {
+    if (zoomLevel > 1 && e.touches.length === 1) {
+      setIsDragging(true);
+      setStartDragPosition({
+        x: e.touches[0].clientX - dragPosition.x,
+        y: e.touches[0].clientY - dragPosition.y
+      });
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (isDragging && zoomLevel > 1 && e.touches.length === 1) {
+      const newX = e.touches[0].clientX - startDragPosition.x;
+      const newY = e.touches[0].clientY - startDragPosition.y;
+      
+      // Calculate boundaries based on zoom level
+      const maxX = (imageRef.current?.offsetWidth * (zoomLevel - 1)) / 2 || 0;
+      const maxY = (imageRef.current?.offsetHeight * (zoomLevel - 1)) / 2 || 0;
+      
+      setDragPosition({
+        x: Math.max(-maxX, Math.min(maxX, newX)),
+        y: Math.max(-maxY, Math.min(maxY, newY))
+      });
+      
+      // Prevent default to avoid page scrolling while dragging
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  const toggleSidebar = () => {
+    setShowSidebar(!showSidebar);
+  };
+
   return (
     <div className="bg-white dark:bg-surface-800 rounded-xl overflow-hidden shadow-card dark:shadow-none border border-surface-200 dark:border-surface-700">
-      <div className="grid grid-cols-1 md:grid-cols-4">
+      <div className="relative flex flex-col md:flex-row md:grid md:grid-cols-4">
+        {/* Mobile Exhibition Selector Toggle */}
+        {isMobileView && (
+          <button 
+            onClick={toggleSidebar}
+            className="flex items-center justify-between w-full p-4 bg-surface-100 dark:bg-surface-700 text-surface-800 dark:text-surface-100"
+          >
+            <span className="font-medium">{selectedExhibition.title}</span>
+            <span className={`transition-transform duration-300 ${showSidebar ? 'rotate-180' : ''}`}>
+              ▼
+            </span>
+          </button>
+        )}
+        
         {/* Exhibition Sidebar */}
-        <div className="bg-surface-100 dark:bg-surface-700 p-4 md:p-6">
-          <h3 className="text-xl font-heading font-medium text-surface-800 dark:text-surface-100 mb-4">
-            Virtual Exhibitions
-          </h3>
-          
-          <div className="space-y-4">
-            {galleryExhibitions.map((exhibition) => (
-              <motion.div
-                key={exhibition.id}
-                whileHover={{ x: 4 }}
-                className={`p-3 rounded-lg cursor-pointer transition-colors duration-300 ${
-                  selectedExhibition.id === exhibition.id
-                    ? "bg-primary/10 dark:bg-primary/20 border-l-4 border-primary dark:border-primary-light"
-                    : "hover:bg-surface-200 dark:hover:bg-surface-600"
-                }`}
-                onClick={() => {
-                  setSelectedExhibition(exhibition);
-                  setCurrentArtworkIndex(0);
-                }}
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-                    <img
-                      src={exhibition.thumbnail}
-                      alt={exhibition.title}
-                      className="w-full h-full object-cover"
-                    />
+        <div className={`
+          bg-surface-100 dark:bg-surface-700 
+          ${isMobileView ? (showSidebar ? 'max-h-96 overflow-y-auto' : 'max-h-0 overflow-hidden') : ''}
+          transition-all duration-300 ease-in-out
+          md:col-span-1 md:max-h-none md:block
+        `}>
+          <div className="p-4 md:p-6">
+            <h3 className="text-xl font-heading font-medium text-surface-800 dark:text-surface-100 mb-4">
+              Virtual Exhibitions
+            </h3>
+            
+            <div className="space-y-4">
+              {galleryExhibitions.map((exhibition) => (
+                <motion.div
+                  key={exhibition.id}
+                  whileHover={{ x: 4 }}
+                  className={`p-3 rounded-lg cursor-pointer transition-colors duration-300 ${
+                    selectedExhibition.id === exhibition.id
+                      ? "bg-primary/10 dark:bg-primary/20 border-l-4 border-primary dark:border-primary-light"
+                      : "hover:bg-surface-200 dark:hover:bg-surface-600"
+                  }`}
+                  onClick={() => {
+                    setSelectedExhibition(exhibition);
+                    setCurrentArtworkIndex(0);
+                    if (isMobileView) {
+                      setShowSidebar(false);
+                    }
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
+                      <img
+                        src={exhibition.thumbnail}
+                        alt={exhibition.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <h4 className={`font-medium ${
+                        selectedExhibition.id === exhibition.id
+                          ? "text-primary dark:text-primary-light"
+                          : "text-surface-700 dark:text-surface-200"
+                      }`}>
+                        {exhibition.title}
+                      </h4>
+                      <p className="text-sm text-surface-500 dark:text-surface-400 line-clamp-1">
+                        {exhibition.artworks.length} artworks
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className={`font-medium ${
-                      selectedExhibition.id === exhibition.id
-                        ? "text-primary dark:text-primary-light"
-                        : "text-surface-700 dark:text-surface-200"
-                    }`}>
-                      {exhibition.title}
-                    </h4>
-                    <p className="text-sm text-surface-500 dark:text-surface-400 line-clamp-1">
-                      {exhibition.artworks.length} artworks
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
         
         {/* Main Viewer */}
         <div className="md:col-span-3">
-          <div className="relative h-[60vh] bg-surface-900 overflow-hidden">
+          <div className="relative h-[40vh] sm:h-[50vh] md:h-[60vh] bg-surface-900 overflow-hidden" ref={viewerRef}>
             {/* Artwork Viewer */}
             <div 
               className="h-full w-full flex items-center justify-center overflow-hidden"
@@ -231,6 +313,9 @@ const MainFeature = () => {
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseLeave}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
               style={{ cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
             >
               <AnimatePresence mode="wait">
@@ -250,24 +335,24 @@ const MainFeature = () => {
                     ref={imageRef}
                     src={currentArtwork.imageUrl}
                     alt={currentArtwork.title}
-                    className="max-h-[60vh] max-w-full object-contain"
+                    className="max-h-[40vh] sm:max-h-[50vh] md:max-h-[60vh] max-w-full object-contain"
                   />
                 </motion.div>
               </AnimatePresence>
             </div>
             
             {/* Controls Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-surface-900 to-transparent">
-              <div className="flex justify-between items-center">
-                <div className="flex space-x-2">
+            <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4 bg-gradient-to-t from-surface-900 to-transparent">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <div className="flex space-x-1 sm:space-x-2">
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={handleZoomIn}
-                    className="p-2 rounded-full bg-surface-800/80 text-white hover:bg-surface-700/80 transition-colors"
+                    className="p-1.5 sm:p-2 rounded-full bg-surface-800/80 text-white hover:bg-surface-700/80 transition-colors"
                     aria-label="Zoom in"
                   >
-                    <ZoomIn size={18} />
+                    <ZoomIn size={16} className="sm:size-18" />
                   </motion.button>
                   
                   <motion.button
@@ -275,14 +360,14 @@ const MainFeature = () => {
                     whileTap={{ scale: 0.9 }}
                     onClick={handleZoomOut}
                     disabled={zoomLevel <= 1}
-                    className={`p-2 rounded-full ${
+                    className={`p-1.5 sm:p-2 rounded-full ${
                       zoomLevel <= 1
                         ? "bg-surface-800/50 text-surface-500 cursor-not-allowed"
                         : "bg-surface-800/80 text-white hover:bg-surface-700/80"
                     } transition-colors`}
                     aria-label="Zoom out"
                   >
-                    <ZoomOut size={18} />
+                    <ZoomOut size={16} className="sm:size-18" />
                   </motion.button>
                   
                   <motion.button
@@ -290,41 +375,41 @@ const MainFeature = () => {
                     whileTap={{ scale: 0.9 }}
                     onClick={handleReset}
                     disabled={zoomLevel === 1 && dragPosition.x === 0 && dragPosition.y === 0}
-                    className={`p-2 rounded-full ${
+                    className={`p-1.5 sm:p-2 rounded-full ${
                       zoomLevel === 1 && dragPosition.x === 0 && dragPosition.y === 0
                         ? "bg-surface-800/50 text-surface-500 cursor-not-allowed"
                         : "bg-surface-800/80 text-white hover:bg-surface-700/80"
                     } transition-colors`}
                     aria-label="Reset view"
                   >
-                    <RotateCcw size={18} />
+                    <RotateCcw size={16} className="sm:size-18" />
                   </motion.button>
                 </div>
                 
-                <div className="flex items-center space-x-4">
-                  <div className="text-white text-sm">
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  <div className="text-white text-xs sm:text-sm">
                     {currentArtworkIndex + 1} / {selectedExhibition.artworks.length}
                   </div>
                   
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-1 sm:space-x-2">
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={handlePrevArtwork}
-                      className="p-2 rounded-full bg-surface-800/80 text-white hover:bg-surface-700/80 transition-colors"
+                      className="p-1.5 sm:p-2 rounded-full bg-surface-800/80 text-white hover:bg-surface-700/80 transition-colors"
                       aria-label="Previous artwork"
                     >
-                      <ChevronLeft size={18} />
+                      <ChevronLeft size={16} className="sm:size-18" />
                     </motion.button>
                     
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={handleNextArtwork}
-                      className="p-2 rounded-full bg-surface-800/80 text-white hover:bg-surface-700/80 transition-colors"
+                      className="p-1.5 sm:p-2 rounded-full bg-surface-800/80 text-white hover:bg-surface-700/80 transition-colors"
                       aria-label="Next artwork"
                     >
-                      <ChevronRight size={18} />
+                      <ChevronRight size={16} className="sm:size-18" />
                     </motion.button>
                   </div>
                   
@@ -332,14 +417,14 @@ const MainFeature = () => {
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setShowInfo(!showInfo)}
-                    className={`p-2 rounded-full ${
+                    className={`p-1.5 sm:p-2 rounded-full ${
                       showInfo
                         ? "bg-primary text-white"
                         : "bg-surface-800/80 text-white hover:bg-surface-700/80"
                     } transition-colors`}
                     aria-label="Show information"
                   >
-                    <Info size={18} />
+                    <Info size={16} className="sm:size-18" />
                   </motion.button>
                 </div>
               </div>
@@ -353,15 +438,15 @@ const MainFeature = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
                   transition={{ duration: 0.3 }}
-                  className="absolute top-0 right-0 w-full md:w-72 bg-surface-800/90 backdrop-blur-sm p-4 m-4 rounded-lg"
+                  className="absolute top-0 right-0 w-full sm:w-3/4 md:w-72 bg-surface-800/90 backdrop-blur-sm p-3 sm:p-4 m-0 sm:m-2 md:m-4 rounded-lg"
                 >
-                  <h3 className="text-xl font-heading font-medium text-white mb-2">
+                  <h3 className="text-lg sm:text-xl font-heading font-medium text-white mb-1 sm:mb-2">
                     {currentArtwork.title}
                   </h3>
-                  <p className="text-surface-300 mb-1">
+                  <p className="text-surface-300 text-sm sm:text-base mb-1">
                     by {currentArtwork.artist}
                   </p>
-                  <p className="text-white/80 text-sm mt-4">
+                  <p className="text-white/80 text-xs sm:text-sm mt-2 sm:mt-4">
                     {currentArtwork.description}
                   </p>
                 </motion.div>
@@ -370,16 +455,16 @@ const MainFeature = () => {
           </div>
           
           {/* Exhibition Description */}
-          <div className="p-6">
-            <h2 className="text-2xl font-heading font-semibold text-surface-800 dark:text-surface-100 mb-3">
+          <div className="p-4 sm:p-6">
+            <h2 className="text-xl sm:text-2xl font-heading font-semibold text-surface-800 dark:text-surface-100 mb-2 sm:mb-3">
               {selectedExhibition.title}
             </h2>
-            <p className="text-surface-600 dark:text-surface-300 mb-6">
+            <p className="text-sm sm:text-base text-surface-600 dark:text-surface-300 mb-4 sm:mb-6">
               {selectedExhibition.description}
             </p>
             
             {/* Artwork Thumbnails */}
-            <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
+            <div className="flex space-x-3 sm:space-x-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
               {selectedExhibition.artworks.map((artwork, index) => (
                 <motion.div
                   key={artwork.id}
@@ -390,7 +475,7 @@ const MainFeature = () => {
                   }`}
                   onClick={() => setCurrentArtworkIndex(index)}
                 >
-                  <div className="w-24 h-24 rounded-md overflow-hidden">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden">
                     <img
                       src={artwork.imageUrl}
                       alt={artwork.title}
