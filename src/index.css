@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-medium;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .art-card-shadow {
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .art-card-shadow-dark {
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+  }
+  
+  .artwork-frame {
+    @apply relative;
+  }
+  
+  .artwork-frame::before {
+    content: "";
+    @apply absolute inset-0 border-[10px] border-accent/20 pointer-events-none;
+  }
+  
+  .artwork-frame-dark::before {
+    @apply border-accent/10;
+  }
+  
+  .masonry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-gap: 1.5rem;
+    grid-auto-flow: dense;
+  }
+  
+  .masonry-grid > div:nth-child(3n) {
+    grid-row: span 2;
+  }
+  
+  .masonry-grid > div:nth-child(5n) {
+    grid-column: span 2;
+  }
+}
